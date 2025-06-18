@@ -3,7 +3,7 @@ name: FB Token Refresh
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 7 14 * *'  # elke 14e om 07:00 UTC
+    - cron: '0 7 14 * *'  
 
 permissions:
   contents: write
@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      CLIENT_ID:      ${{ secrets.FB_CLIENT_ID }}
-      CLIENT_SECRET:  ${{ secrets.FB_CLIENT_SECRET }}
+      CLIENT_ID: ${{ secrets.FB_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}
       FB_SHORT_TOKEN: ${{ secrets.FB_SHORT_TOKEN }}
-      SECRET_NAME:    FB_LONG_TOKEN
+      SECRET_NAME: FB_LONG_TOKEN
 
     steps:
       - name: Checkout using PAT
@@ -29,11 +29,7 @@ jobs:
         id: refresh
         run: |
           NEW_TOKEN=$(curl -s \
-            "https://graph.facebook.com/v23.0/oauth/access_token?\
-grant_type=fb_exchange_token&\
-client_id=${CLIENT_ID}&\
-client_secret=${CLIENT_SECRET}&\
-fb_exchange_token=${FB_SHORT_TOKEN}" \
+            "https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&fb_exchange_token=${FB_SHORT_TOKEN}" \
             | jq -r .access_token)
 
           if [[ -z "$NEW_TOKEN" || "$NEW_TOKEN" == "null" ]]; then

@@ -4,24 +4,21 @@ set -euo pipefail
 CLIENT_ID="${CLIENT_ID}"
 CLIENT_SECRET="${CLIENT_SECRET}"
 FB_SHORT_TOKEN="${FB_SHORT_TOKEN}"
-HISTORY_FILE="token_history.log"
-OUTPUT_FILE="long_lived_token_current.txt"
 
-RESPONSE=$(
-  curl -s "https://graph.facebook.com/v23.0/oauth/access_token?\
+RESPONSE=$(curl -s \
+  "https://graph.facebook.com/v23.0/oauth/access_token?\
 grant_type=fb_exchange_token&\
 client_id=${CLIENT_ID}&\
 client_secret=${CLIENT_SECRET}&\
-fb_exchange_token=${FB_SHORT_TOKEN}"
-)
+fb_exchange_token=${FB_SHORT_TOKEN}")
 
-NEW_TOKEN=$(echo "$RESPONSE" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
-
-if [[ -n "$NEW_TOKEN" ]]; then
-  echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") $NEW_TOKEN" >> "${HISTORY_FILE}"
-  echo "$NEW_TOKEN" > "${OUTPUT_FILE}"
-  echo "✅ Token refreshed"
-else
-  echo "⚠️ Refresh failed: $RESPONSE" >&2
+NEW_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+if [[ -z "$NEW_TOKEN" ]]; then
+  ERR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // "Unknown error"')
+  echo "⚠️ FB-refresh failed: $ERR_MSG" >&2
   exit 1
 fi
+
+echo "::add-mask::$NEW_TOKEN"
+
+echo "$NEW_TOKEN"

@@ -53,13 +53,13 @@ fb_exchange_token=${FB_SHORT_TOKEN}" \
 
       - name: Persist token locally
         run: |
-          echo "${{ steps.refresh.outputs.new_token }}" \
-            > long_lived_token_current.txt
-          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") ${{ steps.refresh.outputs.new_token }}" \
-            >> token_history.log
+          echo "${{ steps.refresh.outputs.new_token }}" > long_lived_token_current.txt
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") ${{ steps.refresh.outputs.new_token }}" >> token_history.log
 
       - name: Notify via Slack
         run: |
-          curl -X POST -H 'Content-Type: application/json' \
-            --data '{"text":"🔑 *Nieuwe FB long-lived token*:\n```'"${{ steps.refresh.outputs.new_token }}"'```"}' \
-            ${{ secrets.SLACK_WEBHOOK_URL }}
+          TEXT=$(printf '{"text":"🔑 *Nieuwe FB long-lived token*:\n```%s```"}' "${{ steps.refresh.outputs.new_token }}")
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            --data "${TEXT}" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"

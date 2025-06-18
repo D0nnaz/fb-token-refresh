@@ -19,6 +19,6 @@ if [[ -z "$NEW_TOKEN" ]]; then
   exit 1
 fi
 
-echo "::add-mask::$NEW_TOKEN"
+echo "::add-mask::$NEW_TOKEN" >&2
 
-echo "$NEW_TOKEN"
+printf '%s' "$NEW_TOKEN"

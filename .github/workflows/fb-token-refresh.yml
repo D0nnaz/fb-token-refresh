@@ -1,51 +1,47 @@
-name: FB Token Refresh
+name: FB Token → Slack
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 7 14 * *'
+    - cron: '0 7 14 * *'  # elke 14e om 07:00 UTC
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  refresh:
+  notify:
     runs-on: ubuntu-latest
 
     env:
       CLIENT_ID:        ${{ secrets.FB_CLIENT_ID }}
       CLIENT_SECRET:    ${{ secrets.FB_CLIENT_SECRET }}
       FB_SHORT_TOKEN:   ${{ secrets.FB_SHORT_TOKEN }}
-      SECRET_NAME:      FB_LONG_TOKEN
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
-      - name: Checkout (voor PAT)
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.PAT_WRITE }}
-          persist-credentials: true
-
-      - name: Refresh FB token via script
+      - name: Refresh FB token & mask
         id: refresh
         run: |
-          chmod +x ./fb-refresh-token.sh
-          # de script echo't alleen de token en maskeert ‘m
-          TOKEN=$(./fb-refresh-token.sh)
-          echo "new_token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Update GitHub Secret
-        run: |
-          gh secret set "$SECRET_NAME" \
-            --body "${{ steps.refresh.outputs.new_token }}" \
-            --repo "${GITHUB_REPOSITORY}"
-        env:
-          GH_TOKEN: ${{ secrets.PAT_WRITE }}
+          set -euo pipefail
+          # 1) Vraag nieuw token aan
+          RESPONSE=$(curl -s \
+            "https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&fb_exchange_token=${FB_SHORT_TOKEN}")
+          # 2) Parse of faal
+          NEW_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+          if [[ -z "$NEW_TOKEN" ]]; then
+            MSG=$(echo "$RESPONSE" | jq -r '.error.message // "Unknown error"')
+            echo "⚠️ FB-refresh failed: $MSG" >&2
+            exit 1
+          fi
+          # 3) Mask de token in de log
+          echo "::add-mask::$NEW_TOKEN" >&2
+          # 4) Stel output in
+          echo "token=$NEW_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Notify via Slack
         run: |
-          PAYLOAD=$(printf '{"text":"🔑 Nieuwe FB token:\n```%s```"}' "${{ steps.refresh.outputs.new_token }}")
+          # Bouw JSON-payload
+          PAYLOAD=$(printf '{"text":"🔑 *Nieuwe FB-token*:\n```%s```"}' "${{ steps.refresh.outputs.token }}")
           curl -X POST \
-            -H "Content-Type: application/json" \
+            -H 'Content-Type: application/json' \
             --data "${PAYLOAD}" \
             "${SLACK_WEBHOOK_URL}"
